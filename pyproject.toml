@@ -1,0 +1,14 @@
+[project]
+name = "sinyal-data-layer"
+version = "0.1.0"
+description = "Data layer: Binance spot candle ingestion into SQLite"
+requires-python = ">=3.11"
+dependencies = [
+    "ccxt",
+    "pandas",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+]
