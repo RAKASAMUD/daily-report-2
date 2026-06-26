@@ -177,3 +177,85 @@ class TestRandomWalkCandles:
         times = [r[0] for r in rows]
         assert times == sorted(times)
         assert len(set(times)) == len(times)  # no duplicates
+
+
+# ---------------------------------------------------------------------------
+# Tests: with_retry — Task C2
+# ---------------------------------------------------------------------------
+
+class TestWithRetry:
+    def test_fails_twice_then_succeeds_returns_result(self):
+        """A callable that fails twice then succeeds must return the success value."""
+        from data_layer.binance import with_retry
+
+        call_count = 0
+        sleep_calls = []
+
+        def flaky():
+            nonlocal call_count
+            call_count += 1
+            if call_count < 3:
+                raise ConnectionError("transient")
+            return "ok"
+
+        result = with_retry(flaky, attempts=3, base_delay=1.0, _sleep=sleep_calls.append)
+        assert result == "ok"
+        assert call_count == 3
+
+    def test_fail_twice_sleeps_with_backoff(self):
+        """Sleep durations grow exponentially: base, base*2, ..."""
+        from data_layer.binance import with_retry
+
+        call_count = 0
+        sleep_calls = []
+
+        def flaky():
+            nonlocal call_count
+            call_count += 1
+            if call_count < 3:
+                raise ConnectionError("transient")
+            return "ok"
+
+        with_retry(flaky, attempts=3, base_delay=0.5, _sleep=sleep_calls.append)
+        # Two failures → two sleeps: 0.5, 1.0
+        assert len(sleep_calls) == 2
+        assert sleep_calls[0] == pytest.approx(0.5)
+        assert sleep_calls[1] == pytest.approx(1.0)
+
+    def test_always_fails_raises_after_attempts(self):
+        """If all attempts fail, the original exception is re-raised."""
+        from data_layer.binance import with_retry
+
+        call_count = 0
+
+        def always_fail():
+            nonlocal call_count
+            call_count += 1
+            raise ValueError("always bad")
+
+        with pytest.raises(ValueError, match="always bad"):
+            with_retry(always_fail, attempts=3, base_delay=0.0, _sleep=lambda _: None)
+
+        assert call_count == 3
+
+    def test_succeeds_first_try_no_sleep(self):
+        """If the first call succeeds, sleep is never called."""
+        from data_layer.binance import with_retry
+
+        sleep_calls = []
+
+        result = with_retry(lambda: 42, attempts=3, base_delay=1.0, _sleep=sleep_calls.append)
+        assert result == 42
+        assert sleep_calls == []
+
+    def test_attempts_1_raises_immediately(self):
+        """With attempts=1, a single failure propagates immediately."""
+        from data_layer.binance import with_retry
+
+        with pytest.raises(RuntimeError):
+            with_retry(
+                lambda: (_ for _ in ()).throw(RuntimeError("boom")),
+                attempts=1,
+                base_delay=0.0,
+                _sleep=lambda _: None,
+            )
