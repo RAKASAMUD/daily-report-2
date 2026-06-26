@@ -1,0 +1,145 @@
+"""Tick runner — Task D2.
+
+Responsibilities:
+- floor_to_5min : align "now" to the 5-minute grid
+- run_tick      : for each due timeframe × symbol, call sync_pair; isolate errors
+- main          : single-instance lock, real ccxt exchange, connect + run_tick
+"""
+
+import logging
+import os
+import time
+
+from data_layer.config import (
+    BACKFILL_DAYS,
+    DB_PATH,
+    SYMBOLS,
+    TIMEFRAME_MS,
+    TIMEFRAMES,
+)
+from data_layer.db import connect, init_schema
+from data_layer.pipeline import sync_pair
+from data_layer.schedule import due_timeframes
+
+logger = logging.getLogger(__name__)
+
+_5MIN_MS = 300_000  # milliseconds in 5 minutes
+_LOCK_FILE = "data/runner.lock"
+
+
+# ---------------------------------------------------------------------------
+# floor_to_5min
+# ---------------------------------------------------------------------------
+
+def floor_to_5min(now_ms: int) -> int:
+    """Floor an epoch-millisecond timestamp to the nearest 5-minute boundary."""
+    return (now_ms // _5MIN_MS) * _5MIN_MS
+
+
+# ---------------------------------------------------------------------------
+# run_tick
+# ---------------------------------------------------------------------------
+
+def run_tick(
+    conn,
+    adapter,
+    now_ms: int,
+    symbols: list[str],
+    timeframes: list[str],
+    backfill_days: int,
+) -> dict:
+    """
+    Run one 5-minute tick.
+
+    1. Floor now_ms to the 5-minute grid.
+    2. Determine which timeframes just closed.
+    3. For each symbol × due timeframe: call sync_pair, catching all exceptions.
+
+    Returns
+    -------
+    dict : {(symbol, timeframe): int_inserted | Exception}
+        Only contains entries for pairs that were actually processed
+        (i.e., whose timeframe was due). Empty dict if no timeframe is due.
+    """
+    now = floor_to_5min(now_ms)
+    due = due_timeframes(now, timeframes)
+    summary: dict = {}
+
+    for symbol in symbols:
+        for tf in due:
+            try:
+                inserted = sync_pair(conn, adapter, symbol, tf, now, backfill_days)
+                summary[(symbol, tf)] = inserted
+                logger.info("sync OK  %s/%s  inserted=%d", symbol, tf, inserted)
+            except Exception as exc:  # noqa: BLE001
+                summary[(symbol, tf)] = exc
+                logger.warning(
+                    "sync FAIL %s/%s  error=%s", symbol, tf, exc, exc_info=True
+                )
+
+    return summary
+
+
+# ---------------------------------------------------------------------------
+# main  (wiring only — not unit-tested; covered by E2)
+# ---------------------------------------------------------------------------
+
+def main() -> None:
+    """
+    Entry point for the cron trigger.
+
+    - Acquires an exclusive fcntl.flock on a lock file (exits immediately if
+      another process already holds it — single-instance guarantee).
+    - Builds a real ccxt.binance() exchange with enableRateLimit=True.
+    - Connects to the SQLite DB and initialises the schema.
+    - Runs one tick at now = time.time() * 1000.
+    - Logs a one-line summary.
+    """
+    # Single-instance lock (Unix only; no-op on Windows dev machines)
+    lock_fh = None
+    try:
+        import fcntl  # noqa: PLC0415 — available on Linux VPS
+        os.makedirs(os.path.dirname(_LOCK_FILE), exist_ok=True)
+        lock_fh = open(_LOCK_FILE, "w")  # noqa: WPS515
+        try:
+            fcntl.flock(lock_fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            logger.error("Another runner instance is already running. Exiting.")
+            return
+    except ImportError:
+        # fcntl not available on Windows — skip locking during local dev
+        logger.warning("fcntl not available; skipping single-instance lock.")
+
+    try:
+        import ccxt  # noqa: PLC0415
+
+        exchange = ccxt.binance({"enableRateLimit": True})
+        from data_layer.binance import BinanceAdapter
+
+        adapter = BinanceAdapter(exchange)
+
+        os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+        conn = connect(DB_PATH)
+        init_schema(conn)
+
+        now_ms = int(time.time() * 1000)
+        summary = run_tick(conn, adapter, now_ms, SYMBOLS, TIMEFRAMES, BACKFILL_DAYS)
+
+        total_inserted = sum(v for v in summary.values() if isinstance(v, int))
+        errors = [(k, v) for k, v in summary.items() if isinstance(v, Exception)]
+        logger.info(
+            "tick done: %d pairs processed, %d inserted, %d errors",
+            len(summary),
+            total_inserted,
+            len(errors),
+        )
+        for (sym, tf), exc in errors:
+            logger.warning("  failed: %s/%s — %s", sym, tf, exc)
+
+    finally:
+        if lock_fh is not None:
+            lock_fh.close()
+
+
+if __name__ == "__main__":
+    main()
