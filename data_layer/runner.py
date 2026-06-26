@@ -18,6 +18,7 @@ from data_layer.config import (
     TIMEFRAMES,
 )
 from data_layer.db import connect, init_schema
+from data_layer.logging_setup import setup_logging
 from data_layer.pipeline import sync_pair
 from data_layer.schedule import due_timeframes
 
@@ -95,6 +96,9 @@ def main() -> None:
     - Runs one tick at now = time.time() * 1000.
     - Logs a one-line summary.
     """
+    # Initialise logging first so every subsequent log line is captured
+    setup_logging()
+
     # Single-instance lock (Unix only; no-op on Windows dev machines)
     lock_fh = None
     try:
