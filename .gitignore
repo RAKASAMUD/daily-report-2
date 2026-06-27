@@ -1,0 +1,36 @@
+# Markdown notes
+*.md
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Data / DB
+data/
+*.db
+*.db-wal
+*.db-shm
+
+# Logs
+*.log
+
+# Env
+.env
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
