@@ -113,3 +113,29 @@ def get_candles(
     if not df.empty:
         df = df.sort_values("open_time").reset_index(drop=True)
     return df
+
+
+def get_candles_since(
+    conn: sqlite3.Connection,
+    symbol: str,
+    timeframe: str,
+    since_ms: int,
+) -> pd.DataFrame:
+    """
+    Return all candles for the given symbol/timeframe with open_time >= since_ms,
+    ordered ascending by open_time. Used by the resolver to fetch the resolution window.
+    """
+    rows = conn.execute(
+        """
+        SELECT open_time, open, high, low, close, volume
+        FROM candles
+        WHERE symbol = ? AND timeframe = ? AND open_time >= ?
+        ORDER BY open_time ASC
+        """,
+        (symbol, timeframe, since_ms),
+    ).fetchall()
+
+    return pd.DataFrame(
+        rows,
+        columns=["open_time", "open", "high", "low", "close", "volume"],
+    )

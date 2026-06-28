@@ -1,0 +1,5 @@
+"""Tracking config — Task A1."""
+
+TIMEOUT_BARS = 10
+ACTIVE_WINDOW_BUFFER_BARS = 2
+N_MIN_CONFIDENCE = 20
