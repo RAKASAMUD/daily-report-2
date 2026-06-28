@@ -23,7 +23,10 @@ from data_layer.pipeline import sync_pair
 from data_layer.schedule import due_timeframes
 from signal_engine.engine import run_engine
 from signal_engine.registry import get_strategies
-from signal_engine.store import init_signals_schema
+from signal_engine.store import init_signals_schema, migrate_signals_schema
+from delivery.config import TARGET
+from delivery.deliver import deliver_pending
+from delivery.notifier import HermesNotifier
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +85,29 @@ def run_tick(
                 )
 
     return summary
+
+
+# ---------------------------------------------------------------------------
+# run_delivery_step
+# ---------------------------------------------------------------------------
+
+def run_delivery_step(conn, now_ms: int, notifier=None) -> None:
+    """
+    Run the delivery step (outbox drain).
+    Isolated in its own try/except so failures do not crash the runner.
+    """
+    migrate_signals_schema(conn)
+    if notifier is None:
+        notifier = HermesNotifier(TARGET)
+        
+    try:
+        stats = deliver_pending(conn, notifier, now_ms=now_ms)
+        logger.info(
+            "delivery: attempted=%d sent=%d failed=%d",
+            stats.get("attempted", 0), stats.get("sent", 0), stats.get("failed", 0)
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.error("delivery error: %s", exc, exc_info=True)
 
 
 # ---------------------------------------------------------------------------
@@ -151,6 +177,9 @@ def main() -> None:
             # Stage 4 will consume `new_signals` here later.
         except Exception as eng_exc:  # noqa: BLE001
             logger.error("engine error (ingestion unharmed): %s", eng_exc, exc_info=True)
+
+        # ── Delivery Engine (runs after signal engine) ───────────────────
+        run_delivery_step(conn, now_ms)
 
     finally:
         if lock_fh is not None:
