@@ -77,3 +77,33 @@ class TestFormatSignal:
         assert "SL:    0.049" in card
         assert "(+4.0%)" in card
         assert "(-2.0%)" in card
+
+
+# ---------------------------------------------------------------------------
+# Task D2 tests — confidence line
+# ---------------------------------------------------------------------------
+
+class TestFormatSignalConfidence:
+    def test_no_stats_shows_building_zero(self):
+        sig = _make_signal()
+        card = format_signal(sig, stats=None)
+        assert "Confidence: building (n=0)" in card
+
+    def test_sparse_group_shows_building(self):
+        sig = _make_signal()
+        stats = {("ema_cross", "1h"): {"n": 5, "wins": 3, "win_rate": 0.6, "expectancy": 1.0}}
+        card = format_signal(sig, stats=stats)
+        assert "Confidence: building (n=5)" in card
+
+    def test_sufficient_group_shows_percentage(self):
+        sig = _make_signal()
+        stats = {("ema_cross", "1h"): {"n": 25, "wins": 18, "win_rate": 0.72, "expectancy": 1.1}}
+        card = format_signal(sig, stats=stats)
+        assert "Confidence: 72% TP-first (n=25)" in card
+
+    def test_formatter_is_pure_no_db_access(self):
+        """Formatter takes stats dict in, not a db conn — no side effects."""
+        sig = _make_signal()
+        stats = {("ema_cross", "1h"): {"n": 30, "wins": 21, "win_rate": 0.7, "expectancy": 1.0}}
+        # Calling twice returns identical results (pure)
+        assert format_signal(sig, stats=stats) == format_signal(sig, stats=stats)

@@ -1,7 +1,8 @@
-"""Signal formatting — Task B1."""
+"""Signal formatting — Task B1 / amended D2."""
 
 from datetime import datetime, timezone
 from signal_engine.types import Signal
+from tracking.stats import confidence_label
 
 
 def _format_price(price: float) -> str:
@@ -15,9 +16,12 @@ def _format_price(price: float) -> str:
     return s
 
 
-def format_signal(sig: Signal) -> str:
+def format_signal(sig: Signal, stats: dict | None = None) -> str:
     """
     Format a Signal into a scannable text card for delivery.
+
+    stats: optional dict keyed by (strategy, timeframe) from aggregate_stats().
+           If None or group not found, confidence shows "building (n=0)".
     """
     direction_upper = sig.direction.upper()
     icon = "📈" if direction_upper == "LONG" else "📉"
@@ -32,6 +36,10 @@ def format_signal(sig: Signal) -> str:
     
     dt = datetime.fromtimestamp(sig.bar_open_time / 1000.0, tz=timezone.utc)
     time_str = dt.strftime("%Y-%m-%d %H:%M UTC")
+
+    # Confidence: look up (strategy, timeframe) in stats snapshot
+    group = stats.get((sig.strategy, sig.timeframe)) if stats else None
+    conf_str = confidence_label(group)
     
     lines = [
         f"{icon} {direction_upper} \u00b7 {sig.symbol} \u00b7 {sig.timeframe}",
@@ -41,6 +49,7 @@ def format_signal(sig: Signal) -> str:
         f"SL:    {_format_price(sig.sl)}  ({sl_pct_str})",
         f"R:R:   {sig.rr:.1f}",
         f"Strength: {strength_str}",
+        f"Confidence: {conf_str}",
         f"Bar:   {time_str}",
     ]
     return "\n".join(lines)

@@ -1,4 +1,4 @@
-"""Delivery driver — Task C1."""
+"""Delivery driver — Task C1 / amended D2."""
 
 import logging
 
@@ -6,6 +6,8 @@ from delivery.config import MAX_PER_TICK
 from delivery.format import format_signal
 from delivery.notifier import Notifier
 from signal_engine.store import get_undelivered, mark_sent
+from tracking.store import get_outcome_rows
+from tracking.stats import aggregate_stats
 
 logger = logging.getLogger(__name__)
 
@@ -19,17 +21,26 @@ def deliver_pending(
 ) -> dict:
     """
     Drain the outbox: fetch undelivered signals, format, and send.
-    
-    If send succeeds, mark as sent. If it fails or raises, leave it NULL 
+
+    Computes a stats snapshot once per tick and passes it to the formatter
+    so each card shows the current Confidence label. No DB access inside formatter.
+    If send succeeds, mark as sent. If it fails or raises, leave it NULL
     for retry on the next tick. Isolated per signal.
     """
     rows = get_undelivered(conn, max_per_tick)
     sent = 0
     failed = 0
 
+    # Compute stats snapshot once — passed into formatter, not re-queried per signal
+    try:
+        outcome_rows = get_outcome_rows(conn)
+        stats_snapshot = aggregate_stats(outcome_rows)
+    except Exception:  # noqa: BLE001
+        stats_snapshot = None  # outcomes table may not exist yet — degrade gracefully
+
     for sig in rows:
         try:
-            message = formatter(sig)
+            message = formatter(sig, stats_snapshot)
             if notifier.send(message):
                 mark_sent(conn, sig, now_ms)
                 sent += 1

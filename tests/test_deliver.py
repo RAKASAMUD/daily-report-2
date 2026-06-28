@@ -39,7 +39,7 @@ class FakeNotifier:
         return True
 
 
-def fake_formatter(sig: Signal) -> str:
+def fake_formatter(sig: Signal, stats=None) -> str:
     return f"Card for {sig.symbol}"
 
 
