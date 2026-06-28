@@ -43,7 +43,7 @@ import time
 import pandas as pd
 import pytest
 
-from signal_engine.strategies.ema_cross import ema_cross
+from signal_engine.strategies.ema_cross import ema_cross, cross_strength
 from signal_engine.indicators import atr as atr_fn
 from signal_engine.types import Signal
 
@@ -78,6 +78,10 @@ _BASE_PARAMS = {
     "atr_period": 3,
     "atr_mult": 1.5,
     "rr": 2.0,
+    "gap_med": 1.0,
+    "gap_high": 2.0,
+    "trend_med": 2.0,
+    "trend_high": 4.0,
     "symbol": "BTC/USDT",
     "timeframe": "5m",
     "created_at": 1_700_000_999_000,
@@ -207,6 +211,35 @@ class TestEmaCrossFields:
         sig = ema_cross(df, _BASE_PARAMS)
         assert sig.symbol == _BASE_PARAMS["symbol"]
         assert sig.timeframe == _BASE_PARAMS["timeframe"]
+
+    def test_strength_is_populated(self):
+        """Signal must have a valid strength string."""
+        df = _make_ohlc(_SERIES_A)
+        sig = ema_cross(df, _BASE_PARAMS)
+        assert sig.strength in ("low", "med", "high")
+
+
+# ---------------------------------------------------------------------------
+# Tests: cross_strength helper
+# ---------------------------------------------------------------------------
+
+class TestCrossStrength:
+    def test_high_strength(self):
+        # gap >= 2.0 AND trend >= 4.0 -> high
+        assert cross_strength(2.5, 4.5, _BASE_PARAMS) == "high"
+        # Only gap high, trend low
+        assert cross_strength(2.5, 1.0, _BASE_PARAMS) == "high"
+
+    def test_med_strength(self):
+        # gap >= 1.0 AND < 2.0
+        assert cross_strength(1.5, 1.0, _BASE_PARAMS) == "med"
+        # gap is low, but trend is med (>= 2.0)
+        assert cross_strength(0.5, 3.0, _BASE_PARAMS) == "med"
+
+    def test_low_strength(self):
+        # both gap and trend are below med thresholds
+        assert cross_strength(0.5, 1.0, _BASE_PARAMS) == "low"
+
 
 
 # ---------------------------------------------------------------------------

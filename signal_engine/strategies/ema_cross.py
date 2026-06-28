@@ -14,6 +14,15 @@ from signal_engine.indicators import atr, ema
 from signal_engine.types import Signal
 
 
+def cross_strength(gap_pct: float, trend_pct: float, params: dict) -> str:
+    """Calculate the mechanical strength of the cross based on parameterized thresholds."""
+    if gap_pct >= params["gap_high"] or trend_pct >= params["trend_high"]:
+        return "high"
+    if gap_pct >= params["gap_med"] or trend_pct >= params["trend_med"]:
+        return "med"
+    return "low"
+
+
 def ema_cross(df: pd.DataFrame, params: dict) -> Optional[Signal]:
     """
     EMA cross strategy — long only, event-driven at the transition bar.
@@ -66,13 +75,22 @@ def ema_cross(df: pd.DataFrame, params: dict) -> Optional[Signal]:
 
     # ── Trend filter ─────────────────────────────────────────────────────
     reason_parts = [f"EMA{fast_period}>EMA{slow_period} cross"]
+    trend_ema_val = ema(close, trend_period).iloc[-1]
+    
     if use_trend_filter:
-        trend_ema_val = ema(close, trend_period).iloc[-1]
         if close.iloc[-1] <= trend_ema_val:
             return None
         reason_parts.append(f"close>EMA{trend_period}")
 
     reason = ", ".join(reason_parts)
+
+    # ── Strength calculation ─────────────────────────────────────────────
+    gap_pct = (fast_ema.iloc[-1] - slow_ema.iloc[-1]) / slow_ema.iloc[-1] * 100
+    if use_trend_filter:
+        trend_pct = (close.iloc[-1] - trend_ema_val) / trend_ema_val * 100
+    else:
+        trend_pct = 0.0
+    strength = cross_strength(gap_pct, trend_pct, params)
 
     # ── Entry, SL, TP, RR ────────────────────────────────────────────────
     entry = float(close.iloc[-1])
@@ -93,5 +111,6 @@ def ema_cross(df: pd.DataFrame, params: dict) -> Optional[Signal]:
         sl=sl,
         rr=effective_rr,
         reason=reason,
+        strength=strength,
         created_at=created_at,
     )

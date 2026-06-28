@@ -44,7 +44,7 @@ def _make_signal(symbol=SYMBOL, timeframe=TF,
         symbol=symbol, timeframe=timeframe, strategy="fake_strat",
         bar_open_time=bar_open_time, direction="long",
         entry=30_000.0, tp=31_000.0, sl=29_500.0, rr=2.0,
-        reason="test cross", created_at=CREATED_AT,
+        reason="test cross", strength="high", created_at=CREATED_AT,
     )
 
 
@@ -229,7 +229,7 @@ class TestRunEngineMultiple:
                         bar_open_time=s.bar_open_time,
                         direction=s.direction,
                         entry=s.entry, tp=s.tp, sl=s.sl, rr=s.rr,
-                        reason=s.reason, created_at=s.created_at,
+                        reason=s.reason, strength=s.strength, created_at=s.created_at,
                     )
             return fn
 

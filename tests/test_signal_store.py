@@ -28,6 +28,7 @@ def _make_signal(
     sl=29_500.0,
     rr=2.0,
     reason="EMA20>EMA50 cross",
+    strength="high",
     created_at=1_700_000_060_000,
 ) -> Signal:
     return Signal(
@@ -41,6 +42,7 @@ def _make_signal(
         sl=sl,
         rr=rr,
         reason=reason,
+        strength=strength,
         created_at=created_at,
     )
 
@@ -114,6 +116,7 @@ class TestGetSignals:
         assert got.sl == pytest.approx(sig.sl)
         assert got.rr == pytest.approx(sig.rr)
         assert got.reason == sig.reason
+        assert got.strength == sig.strength
         assert got.created_at == sig.created_at
 
     def test_ascending_by_bar_open_time(self):

@@ -15,4 +15,5 @@ class Signal:
     sl: float
     rr: float               # effective (tp-entry)/(entry-sl)
     reason: str
+    strength: str           # "low" | "med" | "high"
     created_at: int         # epoch ms when detected

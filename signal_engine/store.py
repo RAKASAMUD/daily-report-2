@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS signals (
     sl            REAL    NOT NULL,
     rr            REAL    NOT NULL,
     reason        TEXT    NOT NULL,
+    strength      TEXT    NOT NULL,
     created_at    INTEGER NOT NULL,
     PRIMARY KEY (symbol, timeframe, strategy, bar_open_time)
 ) WITHOUT ROWID
@@ -26,8 +27,8 @@ CREATE TABLE IF NOT EXISTS signals (
 _INSERT_SQL = """
 INSERT OR IGNORE INTO signals
     (symbol, timeframe, strategy, bar_open_time, direction,
-     entry, tp, sl, rr, reason, created_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     entry, tp, sl, rr, reason, strength, created_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 """
 
 
@@ -48,7 +49,7 @@ def write_signal(conn, sig: Signal) -> int:
         (
             sig.symbol, sig.timeframe, sig.strategy, sig.bar_open_time,
             sig.direction, sig.entry, sig.tp, sig.sl, sig.rr,
-            sig.reason, sig.created_at,
+            sig.reason, sig.strength, sig.created_at,
         ),
     )
     conn.commit()
@@ -85,7 +86,7 @@ def get_signals(
     # Fetch the `limit` most recent rows (DESC), then flip to ASC for output
     sql = f"""
         SELECT symbol, timeframe, strategy, bar_open_time, direction,
-               entry, tp, sl, rr, reason, created_at
+               entry, tp, sl, rr, reason, strength, created_at
         FROM (
             SELECT * FROM signals {where}
             ORDER BY bar_open_time DESC
@@ -108,7 +109,8 @@ def get_signals(
             sl=row[7],
             rr=row[8],
             reason=row[9],
-            created_at=row[10],
+            strength=row[10],
+            created_at=row[11],
         )
         for row in rows
     ]
