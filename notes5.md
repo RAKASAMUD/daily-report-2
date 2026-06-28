@@ -51,7 +51,7 @@ python -m scripts.resolve_backlog
 ```
 *Verifikasi: Lakukan spot-check pada tabel `outcomes`.*
 ```bash
-sqlite3 data/bot.db "SELECT * FROM outcomes ORDER BY resolved_at DESC LIMIT 10;"
+sqlite3 data/candles.db "SELECT * FROM outcomes ORDER BY resolved_at DESC LIMIT 10;"
 ```
 *Bandingkan hasilnya (entry time vs status win/loss) dengan chart TradingView / Binance aslinya.*
 
