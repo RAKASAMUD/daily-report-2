@@ -52,3 +52,22 @@ def atr(df: pd.DataFrame, period: int) -> pd.Series:
     # seeds the first value = TR[0] automatically.
     return tr.ewm(alpha=1.0 / period, adjust=False).mean()
 
+
+def bollinger_bands(
+    close: pd.Series, period: int = 20, num_std: float = 2.0
+) -> tuple[pd.Series, pd.Series, pd.Series]:
+    """
+    Bollinger Bands (Middle, Upper, Lower).
+
+    Middle = Simple Moving Average (SMA).
+    Std    = Rolling standard deviation (ddof=0 for population std).
+    Upper  = Middle + num_std * Std
+    Lower  = Middle - num_std * Std
+
+    The first `period - 1` values will be NaN.
+    """
+    middle = close.rolling(period).mean()
+    std = close.rolling(period).std(ddof=0)
+    upper = middle + num_std * std
+    lower = middle - num_std * std
+    return middle, upper, lower
