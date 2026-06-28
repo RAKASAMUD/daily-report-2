@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS signals (
     reason        TEXT    NOT NULL,
     strength      TEXT    NOT NULL,
     created_at    INTEGER NOT NULL,
+    sent_at       INTEGER,
     PRIMARY KEY (symbol, timeframe, strategy, bar_open_time)
 ) WITHOUT ROWID
 """
@@ -114,3 +115,61 @@ def get_signals(
         )
         for row in rows
     ]
+
+
+def migrate_signals_schema(conn) -> None:
+    """
+    Idempotent schema migration for outbox support (and Stage 2 amendments).
+    """
+    cur = conn.execute("PRAGMA table_info(signals)")
+    columns = [row[1] for row in cur.fetchall()]
+    
+    if "strength" not in columns:
+        conn.execute("ALTER TABLE signals ADD COLUMN strength TEXT DEFAULT 'unknown'")
+        
+    if "sent_at" not in columns:
+        conn.execute("ALTER TABLE signals ADD COLUMN sent_at INTEGER")
+        # CRITICAL: stamp pre-existing rows as already delivered
+        conn.execute("UPDATE signals SET sent_at = created_at WHERE sent_at IS NULL")
+        
+    conn.commit()
+
+
+def get_undelivered(conn, limit: int) -> list[Signal]:
+    """
+    Return up to `limit` signals that have not been delivered yet (sent_at IS NULL),
+    ordered oldest first.
+    """
+    sql = """
+        SELECT symbol, timeframe, strategy, bar_open_time, direction,
+               entry, tp, sl, rr, reason, strength, created_at
+        FROM signals
+        WHERE sent_at IS NULL
+        ORDER BY created_at ASC
+        LIMIT ?
+    """
+    rows = conn.execute(sql, (limit,)).fetchall()
+    return [
+        Signal(
+            symbol=row[0], timeframe=row[1], strategy=row[2],
+            bar_open_time=row[3], direction=row[4], entry=row[5],
+            tp=row[6], sl=row[7], rr=row[8], reason=row[9],
+            strength=row[10], created_at=row[11]
+        )
+        for row in rows
+    ]
+
+
+def mark_sent(conn, sig: Signal, sent_at_ms: int) -> None:
+    """
+    Mark a specific signal as sent by updating its sent_at timestamp.
+    """
+    sql = """
+        UPDATE signals
+        SET sent_at = ?
+        WHERE symbol = ? AND timeframe = ? AND strategy = ? AND bar_open_time = ?
+    """
+    conn.execute(sql, (
+        sent_at_ms, sig.symbol, sig.timeframe, sig.strategy, sig.bar_open_time
+    ))
+    conn.commit()
