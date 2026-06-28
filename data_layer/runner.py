@@ -21,6 +21,9 @@ from data_layer.db import connect, init_schema
 from data_layer.logging_setup import setup_logging
 from data_layer.pipeline import sync_pair
 from data_layer.schedule import due_timeframes
+from signal_engine.engine import run_engine
+from signal_engine.registry import get_strategies
+from signal_engine.store import init_signals_schema
 
 logger = logging.getLogger(__name__)
 
@@ -139,6 +142,15 @@ def main() -> None:
         )
         for (sym, tf), exc in errors:
             logger.warning("  failed: %s/%s — %s", sym, tf, exc)
+
+        # ── Signal Engine (runs after ingestion is fully committed) ──────
+        init_signals_schema(conn)   # idempotent — safe to call every tick
+        try:
+            new_signals = run_engine(conn, SYMBOLS, TIMEFRAMES, get_strategies())
+            logger.info("engine: %d new signals", len(new_signals))
+            # Stage 4 will consume `new_signals` here later.
+        except Exception as eng_exc:  # noqa: BLE001
+            logger.error("engine error (ingestion unharmed): %s", eng_exc, exc_info=True)
 
     finally:
         if lock_fh is not None:
