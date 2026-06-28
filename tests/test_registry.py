@@ -51,6 +51,7 @@ class TestGetStrategies:
     def test_returns_list(self):
         result = get_strategies()
         assert isinstance(result, list)
+        assert len(result) >= 2
 
     def test_each_entry_is_registered_strategy(self):
         """Every entry must be a RegisteredStrategy instance."""
@@ -78,6 +79,11 @@ class TestGetStrategies:
             if entry.name == "ema_cross":
                 required = {"fast", "slow", "trend", "use_trend_filter",
                             "atr_period", "atr_mult", "rr"}
+                assert required <= entry.params.keys()
+            elif entry.name == "bollinger_mr":
+                required = {"bb_period", "bb_std", "ema_trend", "slope_lookback",
+                            "use_downtrend_filter", "atr_period", "sl_buffer_atr",
+                            "min_rr", "depth_med", "depth_high"}
                 assert required <= entry.params.keys()
 
     def test_registered_strategy_has_name(self):
