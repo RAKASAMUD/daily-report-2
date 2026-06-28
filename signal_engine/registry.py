@@ -1,11 +1,10 @@
-"""Strategy registry — Task A2 (stub).
+"""Strategy registry — Task A2 / C2 wiring.
 
-Registry wiring to ema_cross (C2) will be added once C2 exists.
-For now, get_strategies() returns a placeholder empty list so tests can
-assert structure; C2 will populate it.
+Registers all strategies. Currently: ema_cross (Setup #1).
+Add new strategies here: one RegisteredStrategy entry per strategy file.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Callable, Optional
 import pandas as pd
 
@@ -22,10 +21,29 @@ class RegisteredStrategy:
     timeframes: list[str]
 
 
-# Internal registry list — populated by register() or direct append.
+# Internal registry — populated at module import time.
 _REGISTRY: list[RegisteredStrategy] = []
 
 
+def _build_registry() -> None:
+    """Populate the registry. Called once at module load."""
+    from signal_engine.strategies.ema_cross import ema_cross
+    from signal_engine.config import EMA_CROSS_PARAMS, CANDLE_LIMIT
+    from data_layer.config import TIMEFRAMES
+
+    _REGISTRY.append(
+        RegisteredStrategy(
+            name="ema_cross",
+            fn=ema_cross,
+            params=EMA_CROSS_PARAMS,
+            timeframes=TIMEFRAMES,
+        )
+    )
+
+
+_build_registry()
+
+
 def get_strategies() -> list[RegisteredStrategy]:
-    """Return all registered strategies (stub — returns empty until C2 wires in)."""
+    """Return all registered strategies."""
     return list(_REGISTRY)
