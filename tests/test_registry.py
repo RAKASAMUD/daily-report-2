@@ -51,7 +51,7 @@ class TestGetStrategies:
     def test_returns_list(self):
         result = get_strategies()
         assert isinstance(result, list)
-        assert len(result) >= 2
+        assert len(result) >= 1
 
     def test_each_entry_is_registered_strategy(self):
         """Every entry must be a RegisteredStrategy instance."""

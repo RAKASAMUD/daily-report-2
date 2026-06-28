@@ -27,24 +27,15 @@ _REGISTRY: list[RegisteredStrategy] = []
 
 def _build_registry() -> None:
     """Populate the registry. Called once at module load."""
-    from signal_engine.strategies.ema_cross import ema_cross
-    from signal_engine.strategies.bollinger_mr import bollinger_mean_reversion
-    from signal_engine.config import EMA_CROSS_PARAMS, MEAN_REV_PARAMS, CANDLE_LIMIT
+    from signal_engine.confluence import evaluate_confluence
+    from signal_engine.confluence_config import CONFLUENCE_PARAMS
     from data_layer.config import TIMEFRAMES
 
     _REGISTRY.append(
         RegisteredStrategy(
-            name="ema_cross",
-            fn=ema_cross,
-            params=EMA_CROSS_PARAMS,
-            timeframes=TIMEFRAMES,
-        )
-    )
-    _REGISTRY.append(
-        RegisteredStrategy(
-            name="bollinger_mr",
-            fn=bollinger_mean_reversion,
-            params=MEAN_REV_PARAMS,
+            name="confluence",
+            fn=evaluate_confluence,
+            params=CONFLUENCE_PARAMS,
             timeframes=TIMEFRAMES,
         )
     )

@@ -13,7 +13,7 @@ Design decisions:
 import logging
 
 from data_layer.db import get_candles
-from signal_engine.config import CANDLE_LIMIT
+from signal_engine.confluence_config import CONFLUENCE_CANDLE_LIMIT
 from signal_engine.registry import RegisteredStrategy
 from signal_engine.store import write_signal
 from signal_engine.types import Signal
@@ -26,7 +26,7 @@ def run_engine(
     symbols: list[str],
     timeframes: list[str],
     strategies: list[RegisteredStrategy],
-    candle_limit: int = CANDLE_LIMIT,
+    candle_limit: int = CONFLUENCE_CANDLE_LIMIT,
 ) -> list[Signal]:
     """
     Evaluate all strategies × symbols × timeframes.
