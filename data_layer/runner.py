@@ -27,6 +27,8 @@ from signal_engine.store import init_signals_schema, migrate_signals_schema
 from delivery.config import TARGET
 from delivery.deliver import deliver_pending
 from delivery.notifier import HermesNotifier
+from tracking.store import init_outcomes_schema
+from tracking.resolver import run_resolver
 
 logger = logging.getLogger(__name__)
 
@@ -111,6 +113,28 @@ def run_delivery_step(conn, now_ms: int, notifier=None) -> None:
 
 
 # ---------------------------------------------------------------------------
+# run_resolver_step
+# ---------------------------------------------------------------------------
+
+def run_resolver_step(conn, now_ms: int) -> None:
+    """
+    Run the outcome resolver (step 5 of the tick).
+    Isolated in its own try/except so failures do not crash the runner.
+    """
+    init_outcomes_schema(conn)
+    try:
+        stats = run_resolver(conn, now_ms=now_ms)
+        logger.info(
+            "resolver: pending=%d resolved=%d failed=%d",
+            stats.get("pending", 0),
+            stats.get("resolved", 0),
+            stats.get("failed", 0),
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.error("resolver error: %s", exc, exc_info=True)
+
+
+# ---------------------------------------------------------------------------
 # main  (wiring only — not unit-tested; covered by E2)
 # ---------------------------------------------------------------------------
 
@@ -180,6 +204,9 @@ def main() -> None:
 
         # ── Delivery Engine (runs after signal engine) ───────────────────
         run_delivery_step(conn, now_ms)
+
+        # ── Resolver (step 5 — runs after delivery) ──────────────────────
+        run_resolver_step(conn, now_ms)
 
     finally:
         if lock_fh is not None:
