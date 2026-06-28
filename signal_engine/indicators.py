@@ -71,3 +71,15 @@ def bollinger_bands(
     upper = middle + num_std * std
     lower = middle - num_std * std
     return middle, upper, lower
+
+
+def ema_slope_falling(ema_series: pd.Series, lookback: int) -> bool:
+    """
+    Check if EMA is falling.
+    Returns True if ema_series.iloc[-1] < ema_series.iloc[-1 - lookback].
+    If the series is not long enough, returns False.
+    """
+    if len(ema_series) <= lookback:
+        return False
+    return bool(ema_series.iloc[-1] < ema_series.iloc[-1 - lookback])
+
