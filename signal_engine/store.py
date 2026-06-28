@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS signals (
     strength      TEXT    NOT NULL,
     created_at    INTEGER NOT NULL,
     sent_at       INTEGER,
+    checklist     TEXT    DEFAULT '',
     PRIMARY KEY (symbol, timeframe, strategy, bar_open_time)
 ) WITHOUT ROWID
 """
@@ -28,8 +29,8 @@ CREATE TABLE IF NOT EXISTS signals (
 _INSERT_SQL = """
 INSERT OR IGNORE INTO signals
     (symbol, timeframe, strategy, bar_open_time, direction,
-     entry, tp, sl, rr, reason, strength, created_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     entry, tp, sl, rr, reason, strength, created_at, checklist)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 """
 
 
@@ -50,7 +51,7 @@ def write_signal(conn, sig: Signal) -> int:
         (
             sig.symbol, sig.timeframe, sig.strategy, sig.bar_open_time,
             sig.direction, sig.entry, sig.tp, sig.sl, sig.rr,
-            sig.reason, sig.strength, sig.created_at,
+            sig.reason, sig.strength, sig.created_at, sig.checklist,
         ),
     )
     conn.commit()
@@ -87,7 +88,7 @@ def get_signals(
     # Fetch the `limit` most recent rows (DESC), then flip to ASC for output
     sql = f"""
         SELECT symbol, timeframe, strategy, bar_open_time, direction,
-               entry, tp, sl, rr, reason, strength, created_at
+               entry, tp, sl, rr, reason, strength, created_at, checklist
         FROM (
             SELECT * FROM signals {where}
             ORDER BY bar_open_time DESC
@@ -112,6 +113,7 @@ def get_signals(
             reason=row[9],
             strength=row[10],
             created_at=row[11],
+            checklist=row[12],
         )
         for row in rows
     ]
@@ -132,6 +134,9 @@ def migrate_signals_schema(conn) -> None:
         # CRITICAL: stamp pre-existing rows as already delivered
         conn.execute("UPDATE signals SET sent_at = created_at WHERE sent_at IS NULL")
         
+    if "checklist" not in columns:
+        conn.execute("ALTER TABLE signals ADD COLUMN checklist TEXT DEFAULT ''")
+        
     conn.commit()
 
 
@@ -142,7 +147,7 @@ def get_undelivered(conn, limit: int) -> list[Signal]:
     """
     sql = """
         SELECT symbol, timeframe, strategy, bar_open_time, direction,
-               entry, tp, sl, rr, reason, strength, created_at
+               entry, tp, sl, rr, reason, strength, created_at, checklist
         FROM signals
         WHERE sent_at IS NULL
         ORDER BY created_at ASC
@@ -154,7 +159,7 @@ def get_undelivered(conn, limit: int) -> list[Signal]:
             symbol=row[0], timeframe=row[1], strategy=row[2],
             bar_open_time=row[3], direction=row[4], entry=row[5],
             tp=row[6], sl=row[7], rr=row[8], reason=row[9],
-            strength=row[10], created_at=row[11]
+            strength=row[10], created_at=row[11], checklist=row[12]
         )
         for row in rows
     ]

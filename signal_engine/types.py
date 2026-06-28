@@ -17,3 +17,4 @@ class Signal:
     reason: str
     strength: str           # "low" | "med" | "high"
     created_at: int         # epoch ms when detected
+    checklist: str = ""     # JSON string of all CheckResults; empty for legacy signals
