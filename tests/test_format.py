@@ -58,6 +58,19 @@ class TestFormatSignal:
         # Check bar time
         assert "Bar:   2026-06-28 07:00 UTC" in card
 
+    def test_format_signal_checklist(self):
+        from dataclasses import replace
+        sig = _make_signal()
+        sig = replace(sig, checklist='[{"name": "EMA Cross", "triggered": true, "detail": "EMA20 > EMA50"}, {"name": "SAR Flip", "triggered": false, "detail": ""}]')
+        
+        card = format_signal(sig)
+        assert "Confluence: 1/2" in card
+        assert "✓ EMA Cross (EMA20 > EMA50)" in card
+        assert "✗ SAR Flip" in card
+        assert "Setup:" not in card
+        assert "Strength:" not in card
+        assert "Entry: 60,305" in card
+
     def test_format_signal_missing_strength(self):
         sig = _make_signal(strength="")
         card = format_signal(sig)

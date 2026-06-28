@@ -32,24 +32,46 @@ def format_signal(sig: Signal, stats: dict | None = None) -> str:
     tp_pct_str = f"+{tp_pct:.1f}%" if tp_pct > 0 else f"{tp_pct:.1f}%"
     sl_pct_str = f"+{sl_pct:.1f}%" if sl_pct > 0 else f"{sl_pct:.1f}%"
     
-    strength_str = sig.strength.upper() if sig.strength else "n/a"
-    
     dt = datetime.fromtimestamp(sig.bar_open_time / 1000.0, tz=timezone.utc)
     time_str = dt.strftime("%Y-%m-%d %H:%M UTC")
 
-    # Confidence: look up (strategy, timeframe) in stats snapshot
     group = stats.get((sig.strategy, sig.timeframe)) if stats else None
     conf_str = confidence_label(group)
-    
+
     lines = [
-        f"{icon} {direction_upper} \u00b7 {sig.symbol} \u00b7 {sig.timeframe}",
-        f"Setup: {sig.reason}",
+        f"{icon} {direction_upper} \u00b7 {sig.symbol} \u00b7 {sig.timeframe}"
+    ]
+
+    has_checklist = hasattr(sig, "checklist") and sig.checklist
+    if has_checklist:
+        import json
+        try:
+            checks = json.loads(sig.checklist)
+            triggered = sum(1 for c in checks if c.get("triggered"))
+            lines.append(f"Confluence: {triggered}/{len(checks)}")
+            for c in checks:
+                mark = "✓" if c.get("triggered") else "✗"
+                detail = f" ({c.get('detail')})" if c.get("detail") else ""
+                lines.append(f"  {mark} {c.get('name')}{detail}")
+        except Exception:
+            has_checklist = False
+
+    if not has_checklist:
+        lines.append(f"Setup: {sig.reason}")
+
+    lines.extend([
         f"Entry: {_format_price(sig.entry)}",
         f"TP:    {_format_price(sig.tp)}  ({tp_pct_str})",
         f"SL:    {_format_price(sig.sl)}  ({sl_pct_str})",
         f"R:R:   {sig.rr:.1f}",
-        f"Strength: {strength_str}",
+    ])
+
+    if not has_checklist:
+        strength_str = sig.strength.upper() if sig.strength else "n/a"
+        lines.append(f"Strength: {strength_str}")
+
+    lines.extend([
         f"Confidence: {conf_str}",
         f"Bar:   {time_str}",
-    ]
+    ])
     return "\n".join(lines)
