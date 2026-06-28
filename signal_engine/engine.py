@@ -66,4 +66,13 @@ def run_engine(
                         exc_info=True,
                     )
 
+    # ── Per-tick summary ─────────────────────────────────────────────────
+    logger.info("engine: %d new signal(s) this tick", len(new_signals))
+    for sig in new_signals:
+        logger.info(
+            "  signal: %s / %s / %s  entry=%.4f  tp=%.4f  sl=%.4f  rr=%.2f",
+            sig.symbol, sig.timeframe, sig.strategy,
+            sig.entry, sig.tp, sig.sl, sig.rr,
+        )
+
     return new_signals
