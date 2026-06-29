@@ -13,7 +13,8 @@ Design decisions:
 import logging
 
 from data_layer.db import get_candles
-from signal_engine.confluence_config import CONFLUENCE_CANDLE_LIMIT
+from signal_engine.confluence_config import CONFLUENCE_CANDLE_LIMIT, MTF_PARENT, MTF_TREND_EMA
+from signal_engine.mtf import compute_all_mtf_states
 from signal_engine.registry import RegisteredStrategy
 from signal_engine.store import write_signal
 from signal_engine.types import Signal
@@ -46,15 +47,17 @@ def run_engine(
     """
     new_signals: list[Signal] = []
 
+    mtf_states = compute_all_mtf_states(conn, symbols, MTF_PARENT, MTF_TREND_EMA, candle_limit)
+
     for strat in strategies:
         eligible_tfs = set(timeframes) & set(strat.timeframes)
         for symbol in symbols:
             for tf in eligible_tfs:
                 try:
                     df = get_candles(conn, symbol, tf, limit=candle_limit)
-                    sig = strat.fn(df, {**strat.params,
-                                        "symbol": symbol,
-                                        "timeframe": tf})
+                    params = {**strat.params, "symbol": symbol, "timeframe": tf}
+                    mtf_aligned = mtf_states.get((symbol, tf))
+                    sig = strat.fn(df, params, mtf_aligned=mtf_aligned)
                     if sig is not None:
                         inserted = write_signal(conn, sig)
                         if inserted == 1:

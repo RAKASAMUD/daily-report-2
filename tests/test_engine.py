@@ -49,7 +49,7 @@ def _make_signal(symbol=SYMBOL, timeframe=TF,
 
 
 # Strategy that ALWAYS returns a Signal (deterministic cross)
-def _always_cross(df: pd.DataFrame, params: dict) -> Signal | None:
+def _always_cross(df: pd.DataFrame, params: dict, **kwargs) -> Signal | None:
     if df.empty:
         return None
     symbol = params.get("symbol", SYMBOL)
@@ -59,12 +59,12 @@ def _always_cross(df: pd.DataFrame, params: dict) -> Signal | None:
 
 
 # Strategy that ALWAYS returns None (no signal)
-def _never_cross(df: pd.DataFrame, params: dict) -> Signal | None:
+def _never_cross(df: pd.DataFrame, params: dict, **kwargs) -> Signal | None:
     return None
 
 
 # Strategy that RAISES an exception
-def _bad_strategy(df: pd.DataFrame, params: dict) -> Signal | None:
+def _bad_strategy(df: pd.DataFrame, params: dict, **kwargs) -> Signal | None:
     raise RuntimeError("strategy exploded!")
 
 
@@ -220,8 +220,8 @@ class TestRunEngineMultiple:
         _seed_candles(conn)
 
         def make_named(name):
-            def fn(df, params):
-                s = _always_cross(df, params)
+            def fn(df, params, **kwargs):
+                s = _always_cross(df, params, **kwargs)
                 if s:
                     return Signal(
                         symbol=s.symbol, timeframe=s.timeframe,
@@ -240,3 +240,58 @@ class TestRunEngineMultiple:
         new = run_engine(conn, [SYMBOL], [TF], strats)
         assert len(new) == 2
         assert len(get_signals(conn)) == 2
+
+class TestRunEngineMTF:
+    def test_mtf_passing(self):
+        conn = _make_conn()
+        _seed_candles(conn, symbol="BTC/USDT", tf="5m", n=10)
+        # Parent 1h trending up
+        for i in range(100):
+            conn.execute(
+                "INSERT INTO candles (symbol, timeframe, open_time, open, high, low, close, volume) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                ("BTC/USDT", "1h", i*1000, 10, 11, 9, 10 + i, 100)
+            )
+        conn.commit()
+
+        # Mock that blocks if mtf_aligned is False
+        def mtf_aware_cross(df, params, mtf_aligned=None):
+            if mtf_aligned is False:
+                return None
+            return _always_cross(df, params)
+
+        strat = _strat("confluence", mtf_aware_cross, timeframes=["5m"])
+        new = run_engine(conn, ["BTC/USDT"], ["5m"], [strat])
+        assert len(new) == 1
+
+    def test_mtf_blocking(self):
+        conn = _make_conn()
+        _seed_candles(conn, symbol="BTC/USDT", tf="5m", n=10)
+        # Parent 1h trending down
+        for i in range(100):
+            conn.execute(
+                "INSERT INTO candles (symbol, timeframe, open_time, open, high, low, close, volume) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                ("BTC/USDT", "1h", i*1000, 100, 101, 99, 100 - i, 100)
+            )
+        conn.commit()
+
+        def mtf_aware_cross(df, params, mtf_aligned=None):
+            if mtf_aligned is False:
+                return None
+            return _always_cross(df, params)
+
+        strat = _strat("confluence", mtf_aware_cross, timeframes=["5m"])
+        new = run_engine(conn, ["BTC/USDT"], ["5m"], [strat])
+        assert len(new) == 0
+
+    def test_mtf_no_parent(self):
+        conn = _make_conn()
+        _seed_candles(conn, symbol="BTC/USDT", tf="4h", n=10)
+        
+        def mtf_aware_cross(df, params, mtf_aligned=None):
+            if mtf_aligned is False:
+                return None
+            return _always_cross(df, params)
+
+        strat = _strat("confluence", mtf_aware_cross, timeframes=["4h"])
+        new = run_engine(conn, ["BTC/USDT"], ["4h"], [strat])
+        assert len(new) == 1
