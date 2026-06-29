@@ -1,3 +1,6 @@
+import sys, os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 import sqlite3, pandas as pd
 from data_layer.config import DB_PATH, SYMBOLS, TIMEFRAMES, TIMEFRAME_MS
 from data_layer.db import get_candles
