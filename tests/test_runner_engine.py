@@ -46,7 +46,7 @@ def _make_signal(symbol=SYMBOL, timeframe=TF,
     )
 
 
-def _always_cross(df: pd.DataFrame, params: dict) -> Signal | None:
+def _always_cross(df: pd.DataFrame, params: dict, **kwargs) -> Signal | None:
     if df.empty:
         return None
     return _make_signal(
@@ -56,7 +56,7 @@ def _always_cross(df: pd.DataFrame, params: dict) -> Signal | None:
     )
 
 
-def _bad_engine_strategy(df: pd.DataFrame, params: dict) -> Signal | None:
+def _bad_engine_strategy(df: pd.DataFrame, params: dict, **kwargs) -> Signal | None:
     raise RuntimeError("engine blew up!")
 
 

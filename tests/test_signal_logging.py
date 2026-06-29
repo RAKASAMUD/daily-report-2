@@ -41,7 +41,7 @@ def _make_signal(symbol=SYMBOL, timeframe=TF,
     )
 
 
-def _always_cross(df: pd.DataFrame, params: dict) -> Signal | None:
+def _always_cross(df: pd.DataFrame, params: dict, **kwargs) -> Signal | None:
     if df.empty:
         return None
     return _make_signal(
@@ -53,8 +53,8 @@ def _always_cross(df: pd.DataFrame, params: dict) -> Signal | None:
 
 
 def _strat(name="fake", timeframes=None) -> RegisteredStrategy:
-    def fn(df, params):
-        return _always_cross(df, {**params, "_strategy_name": name})
+    def fn(df, params, **kwargs):
+        return _always_cross(df, {**params, "_strategy_name": name}, **kwargs)
     return RegisteredStrategy(
         name=name, fn=fn,
         params={"created_at": CREATED_AT},
@@ -90,7 +90,7 @@ class TestSignalLogging:
         conn = _make_conn()
         _seed(conn)
 
-        def explode(df, params):
+        def explode(df, params, **kwargs):
             raise ValueError("boom")
 
         bad_strat = RegisteredStrategy(
@@ -109,7 +109,7 @@ class TestSignalLogging:
         _seed(conn)
 
         none_strat = RegisteredStrategy(
-            name="none", fn=lambda df, p: None,
+            name="none", fn=lambda df, p, **kwargs: None,
             params={}, timeframes=[TF],
         )
 
