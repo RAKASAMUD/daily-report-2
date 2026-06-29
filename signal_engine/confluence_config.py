@@ -1,3 +1,20 @@
+ATR_MULT_BY_TF: dict = {
+    "5m": 2.5,
+    "15m": 2.0,
+    "1h": 1.5,
+    "4h": 1.5,
+}
+
+MTF_PARENT: dict = {
+    "5m": "1h",
+    "15m": "1h",
+    "1h": "4h",
+    "4h": None,
+}
+
+MTF_TREND_EMA: int = 50
+USE_MTF_FILTER: bool = True
+
 CONFLUENCE_PARAMS: dict = {
     # EMA cross
     "fast": 20,
@@ -27,8 +44,11 @@ CONFLUENCE_PARAMS: dict = {
     "sar_af_max": 0.2,
     # Trade levels (universal ATR-based)
     "atr_period": 14,
-    "atr_mult": 1.5,
     "rr": 2.0,
+    "atr_mult_by_tf": ATR_MULT_BY_TF,
+    "mtf_parent": MTF_PARENT,
+    "mtf_trend_ema": MTF_TREND_EMA,
+    "use_mtf_filter": USE_MTF_FILTER,
 }
 
 CONFLUENCE_CANDLE_LIMIT: int = 300
